@@ -1,9 +1,3 @@
-# 📜 Tora User Interface Library Documentation
-
-Welcome to the official documentation for the **Tora User Interface Library**. This guide will walk you through how to implement and use the library to build clean and functional user interfaces.
-
----
-
 ## 📥 I. Getting Started
 
 Before creating any UI elements, you need to load the library using your raw script link.
@@ -260,7 +254,3 @@ ESPTab:AddBind({
 -- Initialize
 Library:Init()
 ```
-
----
-
-*Clean, simple, and ready for production use.*
