@@ -1,0 +1,1073 @@
+local unpack = table.unpack or unpack
+
+local bindableEvent = Instance.new('BindableEvent')
+local isFinished = false
+local mainFrameObj = nil
+
+bindableEvent.Event:Connect(function(m)
+    mainFrameObj = m
+    isFinished = true
+end)
+
+local coreGuiService = game:GetService('CoreGui')
+local tweenService = game:GetService('TweenService')
+local rotateTweenInfo = TweenInfo.new(1, Enum.EasingStyle.Linear, Enum.EasingDirection.InOut, -1)
+local fadeTweenInfo = TweenInfo.new(0.5)
+
+local loadingGui = Instance.new('ScreenGui', coreGuiService)
+loadingGui.Name = 'AkifSpyLoading'
+loadingGui.IgnoreGuiInset = true
+loadingGui.ResetOnSpawn = false
+loadingGui.DisplayOrder = 999
+
+local loadingBackground = Instance.new('Frame', loadingGui)
+loadingBackground.Size = UDim2.new(1, 0, 1, 0)
+loadingBackground.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+loadingBackground.BackgroundTransparency = 1
+loadingBackground.BorderSizePixel = 0
+
+local spinnerFrame = Instance.new('Frame', loadingBackground)
+spinnerFrame.Size = UDim2.fromOffset(60, 60)
+spinnerFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+spinnerFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+spinnerFrame.BackgroundTransparency = 1
+
+Instance.new('UICorner', spinnerFrame).CornerRadius = UDim.new(1, 0)
+
+local spinnerStroke = Instance.new('UIStroke', spinnerFrame)
+spinnerStroke.Color = Color3.fromRGB(255, 255, 255)
+spinnerStroke.Thickness = 4
+spinnerStroke.LineJoinMode = Enum.LineJoinMode.Round
+
+local spinnerGradient = Instance.new('UIGradient', spinnerStroke)
+spinnerGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.7, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(80, 80, 80))
+})
+spinnerGradient.Rotation = 90
+
+local creatorText = Instance.new('TextLabel', loadingBackground)
+creatorText.Size = UDim2.new(1, 0, 0, 50)
+creatorText.Position = UDim2.new(0.5, 0, 0.5, 0)
+creatorText.AnchorPoint = Vector2.new(0.5, 0.5)
+creatorText.BackgroundTransparency = 1
+creatorText.Font = Enum.Font.GothamBold
+creatorText.Text = 'Made with love by AkifRzayev'
+creatorText.TextColor3 = Color3.fromRGB(255, 255, 255)
+creatorText.TextSize = 24
+creatorText.TextTransparency = 1
+
+tweenService:Create(loadingBackground, fadeTweenInfo, {BackgroundTransparency = 0.5}):Play()
+task.wait(0.5)
+
+local spinnerTween = tweenService:Create(spinnerFrame, rotateTweenInfo, {Rotation = 360})
+spinnerTween:Play()
+
+task.spawn(function()
+    if not(set_thread_identity or setthreadidentity or setthreadcaps) or not hookmetamethod or not(getnamecallmethod or get_namecall_method) then
+        pcall(function()
+            game:GetService('StarterGui'):SetCore('SendNotification', {Title = 'akiffspy', Text = 'Executor not supported', Duration = 5})
+        end)
+        bindableEvent:Fire(nil)
+        return
+    end
+
+    local cloneref = cloneref or function(x) return x end
+    local writefile = writefile
+    local readfile = readfile
+    local isfile = isfile
+    local hookmetamethod = hookmetamethod
+    local getnamecallmethod = getnamecallmethod or get_namecall_method
+    local checkcaller = checkcaller
+    local getcallingscript = getcallingscript
+    local decompile = decompile
+
+    local configData = {Settings = {Keybind = 'P'}}
+    local httpService = cloneref(game:GetService('HttpService'))
+
+    if isfile and not isfile('AkifSpySettings.json') then
+        writefile('AkifSpySettings.json', httpService:JSONEncode(configData.Settings))
+    elseif isfile then
+        configData.Settings = httpService:JSONDecode(readfile('AkifSpySettings.json'))
+    end
+
+    task.wait()
+
+    local playersService = cloneref(game:GetService('Players'))
+    local coreGuiServiceRef = cloneref(game:GetService('CoreGui'))
+    local tweenServiceRef = cloneref(game:GetService('TweenService'))
+    local userInputService = cloneref(game:GetService('UserInputService'))
+    local runService = cloneref(game:GetService('RunService'))
+    local localPlayer = playersService.LocalPlayer
+
+    task.wait()
+
+    local remoteList = {}
+    local argsList = {}
+    local countLabelList = {}
+    local scriptList = {}
+    local listElements = {}
+    local stackedRemotes = {}
+    local ignoredRemotes = {}
+    local ignoredArgs = {}
+    local pendingQueue = {}
+    
+    local rootServices = {["ReplicatedStorage"] = true, ["Workspace"] = true, ["Players"] = true, ["Lighting"] = true}
+
+    local function getRootParent(remoteInstance)
+        local parent = remoteInstance.Parent
+        if not parent then return remoteInstance end
+        if rootServices[parent.Name] then return remoteInstance end
+        return parent
+    end
+
+    local function getInstancePath(instance)
+        if not(instance and instance.Parent) then return 'nil' end
+        local pathArray = {}
+        local count = 0
+        while instance and instance ~= game do
+            if instance == localPlayer then
+                count = count + 1
+                pathArray[count] = 'Players.LocalPlayer'
+                break
+            end
+            local cleanName = instance.Name:gsub('"', '\\"')
+            count = count + 1
+            pathArray[count] = cleanName:match('^[%a_][%w_]*$') and ('.' .. cleanName) or string.format(':FindFirstChild("%s")', cleanName)
+            instance = instance.Parent
+        end
+        local left = 1
+        local right = count
+        while left < right do
+            pathArray[left], pathArray[right] = pathArray[right], pathArray[left]
+            left = left + 1
+            right = right - 1
+        end
+        return 'game' .. table.concat(pathArray)
+    end
+
+    local function isRemoteStacked(remoteInstance)
+        local pathKey = getInstancePath(remoteInstance)
+        local isStackedValue = stackedRemotes[pathKey]
+        if isStackedValue == nil then return true end
+        return isStackedValue
+    end
+
+    local spyActive = false
+    local spyHooked = false
+    local autoFireActive = false
+    local autoFireGeneration = 0
+    local isMinimized = false
+    local isMinimizing = false
+
+    local hoverTween = TweenInfo.new(0.2)
+    local clickTween = TweenInfo.new(0.3)
+    local minimizeTween = TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local maximizeTween = TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out)
+
+    local colorDark = Color3.fromRGB(24, 25, 26)
+    local colorMedium = Color3.fromRGB(30, 31, 32)
+    local colorInteractable = Color3.fromRGB(38, 39, 41)
+    local colorHover = Color3.fromRGB(55, 56, 58)
+    local colorActive = Color3.fromRGB(192, 57, 43)
+    local colorActiveHover = Color3.fromRGB(212, 77, 63)
+    local colorGreen = Color3.fromRGB(76, 209, 55)
+
+    local textColorWhite = Color3.fromRGB(255, 255, 255)
+    local textColorNormal = Color3.fromRGB(220, 221, 225)
+    local textColorBright = Color3.fromRGB(200, 200, 200)
+    local textColorTransparent = Color3.fromRGB(150, 155, 170)
+    local textColorDark = Color3.fromRGB(150, 155, 150)
+
+    local strokeColor1 = Color3.fromRGB(10, 11, 12)
+    local strokeColor2 = Color3.fromRGB(15, 16, 17)
+
+    local windowWidth = 280
+    local windowHeight = 480
+    local windowHeightMinimized = 38
+
+    local udimFull = UDim2.new(1, 0, 1, 0)
+    local udimZero = UDim2.new(0, 0, 0, 0)
+
+    local inputMouseButton1 = Enum.UserInputType.MouseButton1
+    local inputTouch = Enum.UserInputType.Touch
+    local inputMouseMovement = Enum.UserInputType.MouseMovement
+
+    local fontBold = Enum.Font.GothamBold
+    local fontRegular = Enum.Font.Gotham
+    local alignLeft = Enum.TextXAlignment.Left
+    local alignRight = Enum.TextXAlignment.Right
+
+    local function playTween(guiObject, tweenInfo, properties)
+        tweenServiceRef:Create(guiObject, tweenInfo, properties):Play()
+    end
+
+    local serializeTable
+    local function serializeValue(value)
+        local objectType = typeof(value)
+        local primitiveType = type(value)
+
+        if value == nil then
+            return 'nil'
+        elseif objectType == 'Instance' then
+            return getInstancePath(value)
+        elseif primitiveType == 'string' then
+            return '"' .. value:gsub('\\', '\\\\'):gsub('"', '\\"') .. '"'
+        elseif primitiveType == 'boolean' or primitiveType == 'number' then
+            return tostring(value)
+        elseif primitiveType == 'table' then
+            return '{' .. serializeTable(value) .. '}'
+        elseif objectType == 'Vector3' then
+            return string.format('Vector3.new(%g,%g,%g)', value.X, value.Y, value.Z)
+        elseif objectType == 'Vector2' then
+            return string.format('Vector2.new(%g,%g)', value.X, value.Y)
+        elseif objectType == 'CFrame' then
+            return string.format('CFrame.new(%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g,%g)', value:GetComponents())
+        elseif objectType == 'Color3' then
+            return string.format('Color3.new(%g,%g,%g)', value.R, value.G, value.B)
+        elseif objectType == 'UDim2' then
+            return string.format('UDim2.new(%g,%g,%g,%g)', value.X.Scale, value.X.Offset, value.Y.Scale, value.Y.Offset)
+        elseif objectType == 'UDim' then
+            return string.format('UDim.new(%g,%g)', value.Scale, value.Offset)
+        elseif objectType == 'BrickColor' then
+            return string.format('BrickColor.new("%s")', tostring(value))
+        elseif objectType == 'EnumItem' then
+            return tostring(value)
+        elseif objectType == 'buffer' then
+            local success, result = pcall(function()
+                return string.format('buffer.fromstring("%s")', buffer.tostring(value):gsub('.', function(char) return string.format('\\%d', string.byte(char)) end))
+            end)
+            return success and result or string.format('buffer(len=%d)', buffer.len(value))
+        else
+            return tostring(value)
+        end
+    end
+
+    serializeTable = function(tableValue)
+        local keys = {}
+        local values = {}
+        local count = 0
+        for key, val in pairs(tableValue) do
+            count = count + 1
+            keys[count] = key
+            values[count] = val
+        end
+        local resultString = {}
+        local resultIndex = 0
+        for i = 1, count do
+            local currentKey = keys[i]
+            local currentValue = values[i]
+            resultIndex = resultIndex + 1
+            resultString[resultIndex] = type(currentKey) == 'string' and ('["' .. tostring(currentKey) .. '"] = ') or ('[' .. tostring(currentKey) .. '] = ')
+            resultIndex = resultIndex + 1
+            resultString[resultIndex] = serializeValue(currentValue)
+            if count > 1 and i < count then
+                resultIndex = resultIndex + 1
+                resultString[resultIndex] = ', '
+            end
+        end
+        return table.concat(resultString)
+    end
+
+    local function formatArguments(argsArray)
+        local formattedArgs = {}
+        local count = 0
+        for i = 1, #argsArray do
+            count = count + 1
+            formattedArgs[count] = serializeValue(argsArray[i])
+        end
+        return table.concat(formattedArgs, ', ')
+    end
+
+    local function normalizeArguments(argsValue)
+        if typeof(argsValue) ~= 'table' then return typeof(argsValue) .. ':' .. tostring(argsValue) end
+        local sortedArgs = {}
+        for key, val in pairs(argsValue) do
+            local valType = typeof(val)
+            if valType == 'table' then
+                sortedArgs[#sortedArgs + 1] = tostring(key) .. '=' .. normalizeArguments(val)
+            else
+                sortedArgs[#sortedArgs + 1] = tostring(key) .. ':' .. valType
+            end
+        end
+        table.sort(sortedArgs)
+        return '{' .. table.concat(sortedArgs, ',') .. '}'
+    end
+
+    local function getArgumentsKey(remoteInstance, argsValue)
+        return remoteInstance, normalizeArguments(argsValue)
+    end
+
+    local function findRemoteIndex(remoteInstance, argsValue)
+        local pathKey = getInstancePath(remoteInstance)
+        if stackedRemotes[pathKey] ~= false then
+            local normalizedKey = normalizeArguments(argsValue)
+            for i = 1, #remoteList do
+                if remoteList[i] == remoteInstance and normalizeArguments(argsList[i]) == normalizedKey then
+                    return i
+                end
+            end
+        end
+        return nil
+    end
+
+    local function addUICornerAndStroke(parentGui, cornerRadius, strokeColor)
+        local corner = Instance.new('UICorner')
+        corner.CornerRadius = UDim.new(0, cornerRadius)
+        corner.Parent = parentGui
+        local stroke = Instance.new('UIStroke')
+        stroke.Color = strokeColor
+        stroke.Thickness = 1
+        stroke.Parent = parentGui
+    end
+
+    local feedbackState = {}
+    local function showFeedback(buttonGui, feedbackText)
+        if not feedbackState[buttonGui] then 
+            feedbackState[buttonGui] = {text = buttonGui.Text, color = buttonGui.TextColor3} 
+        end
+        buttonGui.Text = feedbackText or 'Copied!'
+        buttonGui.TextColor3 = colorGreen
+        local feedbackToken = {}
+        feedbackState[buttonGui].token = feedbackToken
+        task.delay(1, function()
+            if buttonGui and buttonGui.Parent and feedbackState[buttonGui] and feedbackState[buttonGui].token == feedbackToken then
+                buttonGui.Text = feedbackState[buttonGui].text
+                buttonGui.TextColor3 = feedbackState[buttonGui].color
+                feedbackState[buttonGui] = nil
+            end
+        end)
+    end
+
+    local function makeButton(labelText, parentGui, heightValue)
+        local newButton = Instance.new('TextButton', parentGui)
+        newButton.Size = UDim2.new(1, 0, 0, heightValue)
+        newButton.BackgroundColor3 = colorInteractable
+        newButton.BorderSizePixel = 0
+        newButton.Font = fontBold
+        newButton.Text = labelText
+        newButton.TextColor3 = textColorNormal
+        newButton.TextSize = 14
+        Instance.new('UICorner', newButton).CornerRadius = UDim.new(0, 6)
+        newButton.MouseEnter:Connect(function() playTween(newButton, hoverTween, {BackgroundColor3 = colorHover}) end)
+        newButton.MouseLeave:Connect(function() playTween(newButton, hoverTween, {BackgroundColor3 = colorInteractable}) end)
+        return newButton
+    end
+
+    local function createActionButton(labelText, parentGui)
+        return makeButton(labelText, parentGui, 30)
+    end
+
+    local function createMainButton(labelText)
+        return makeButton(labelText, nil, 38)
+    end
+
+    local function createToggleButton(textOff, textOn)
+        local toggleButton = Instance.new('TextButton')
+        toggleButton.Size = UDim2.new(1, 0, 0, 38)
+        toggleButton.BackgroundColor3 = colorInteractable
+        toggleButton.BorderSizePixel = 0
+        toggleButton.Font = fontBold
+        toggleButton.Text = textOff
+        toggleButton.TextColor3 = textColorNormal
+        toggleButton.TextSize = 14
+        Instance.new('UICorner', toggleButton).CornerRadius = UDim.new(0, 6)
+        
+        local isToggled = false
+        local toggleEvent = Instance.new('BindableEvent')
+        
+        toggleButton.MouseEnter:Connect(function() playTween(toggleButton, hoverTween, {BackgroundColor3 = isToggled and colorActiveHover or colorHover}) end)
+        toggleButton.MouseLeave:Connect(function() playTween(toggleButton, hoverTween, {BackgroundColor3 = isToggled and colorActive or colorInteractable}) end)
+        toggleButton.MouseButton1Click:Connect(function()
+            isToggled = not isToggled
+            toggleButton.Text = isToggled and textOn or textOff
+            playTween(toggleButton, clickTween, {BackgroundColor3 = isToggled and colorActive or colorInteractable})
+            toggleEvent:Fire(isToggled)
+        end)
+        
+        return toggleButton, toggleEvent.Event
+    end
+
+    task.wait()
+
+    local spyGui = Instance.new('ScreenGui', coreGuiServiceRef)
+    spyGui.Name = 'AkifSpyGUI_Final'
+    spyGui.IgnoreGuiInset = true
+    spyGui.ResetOnSpawn = false
+
+    local mainFrame = Instance.new('Frame', spyGui)
+    mainFrame.Size = UDim2.fromOffset(windowWidth, windowHeight)
+    mainFrame.Position = UDim2.new(0.5, -140, 0.45, -240)
+    mainFrame.BackgroundColor3 = colorDark
+    mainFrame.BorderSizePixel = 0
+    mainFrame.Active = true
+    mainFrame.Draggable = false
+    mainFrame.Visible = false
+    mainFrame.ClipsDescendants = true
+    addUICornerAndStroke(mainFrame, 8, strokeColor1)
+
+    local mainPadding = Instance.new('UIPadding', mainFrame)
+    mainPadding.PaddingTop = UDim.new(0, 6)
+    mainPadding.PaddingLeft = UDim.new(0, 12)
+    mainPadding.PaddingRight = UDim.new(0, 12)
+    mainPadding.PaddingBottom = UDim.new(0, 12)
+
+    local topBar = Instance.new('Frame', mainFrame)
+    topBar.Size = UDim2.new(1, 0, 0, 26)
+    topBar.BackgroundTransparency = 1
+
+    local minimizeButton = Instance.new('TextButton', topBar)
+    minimizeButton.Size = UDim2.fromOffset(24, 24)
+    minimizeButton.Position = UDim2.fromOffset(0, 1)
+    minimizeButton.BackgroundColor3 = colorMedium
+    minimizeButton.BorderSizePixel = 0
+    minimizeButton.Font = fontBold
+    minimizeButton.Text = '▼'
+    minimizeButton.TextColor3 = textColorNormal
+    minimizeButton.TextSize = 12
+    Instance.new('UICorner', minimizeButton).CornerRadius = UDim.new(0, 6)
+    minimizeButton.MouseEnter:Connect(function() playTween(minimizeButton, hoverTween, {BackgroundColor3 = colorHover}) end)
+    minimizeButton.MouseLeave:Connect(function() playTween(minimizeButton, hoverTween, {BackgroundColor3 = colorMedium}) end)
+
+    local titleLabel = Instance.new('TextLabel', topBar)
+    titleLabel.Size = UDim2.new(1, -30, 1, 0)
+    titleLabel.Position = UDim2.fromOffset(30, 0)
+    titleLabel.BackgroundTransparency = 1
+    titleLabel.TextXAlignment = alignLeft
+    titleLabel.Font = fontBold
+    titleLabel.TextSize = 16
+    titleLabel.TextColor3 = textColorWhite
+    titleLabel.Text = "Akif's Spy"
+
+    local authorLabel = Instance.new('TextLabel', topBar)
+    authorLabel.Size = udimFull
+    authorLabel.BackgroundTransparency = 1
+    authorLabel.TextXAlignment = alignRight
+    authorLabel.Font = fontRegular
+    authorLabel.TextSize = 14
+    authorLabel.TextColor3 = textColorTransparent
+    authorLabel.Text = 'by AkifRzayev'
+
+    local searchBox = Instance.new('TextBox', mainFrame)
+    searchBox.Size = UDim2.new(1, 0, 0, 28)
+    searchBox.Position = UDim2.fromOffset(0, 31)
+    searchBox.BackgroundColor3 = colorInteractable
+    searchBox.BorderSizePixel = 0
+    searchBox.Font = fontRegular
+    searchBox.PlaceholderText = 'Search remotes...'
+    searchBox.PlaceholderColor3 = textColorTransparent
+    searchBox.Text = ''
+    searchBox.TextColor3 = textColorNormal
+    searchBox.TextSize = 13
+    searchBox.ClearTextOnFocus = false
+    Instance.new('UICorner', searchBox).CornerRadius = UDim.new(0, 6)
+    Instance.new('UIPadding', searchBox).PaddingLeft = UDim.new(0, 8)
+
+    local logScroll = Instance.new('ScrollingFrame', mainFrame)
+    logScroll.Size = UDim2.new(1, 0, 1, -198)
+    logScroll.Position = UDim2.fromOffset(0, 64)
+    logScroll.BackgroundTransparency = 1
+    logScroll.BorderSizePixel = 0
+    logScroll.CanvasSize = udimZero
+    logScroll.ScrollBarThickness = 4
+
+    local logListLayout = Instance.new('UIListLayout', logScroll)
+    logListLayout.Padding = UDim.new(0, 5)
+    logListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        logScroll.CanvasSize = UDim2.fromOffset(0, logListLayout.AbsoluteContentSize.Y)
+    end)
+
+    local infoFrame = Instance.new('Frame', spyGui)
+    infoFrame.Size = UDim2.fromOffset(350, 350)
+    infoFrame.BackgroundColor3 = colorMedium
+    infoFrame.BorderSizePixel = 0
+    infoFrame.Visible = false
+    addUICornerAndStroke(infoFrame, 6, strokeColor2)
+
+    local infoTitle = Instance.new('TextLabel', infoFrame)
+    infoTitle.Size = UDim2.new(1, -46, 0, 30)
+    infoTitle.Position = UDim2.fromOffset(8, 8)
+    infoTitle.BackgroundTransparency = 1
+    infoTitle.Font = fontBold
+    infoTitle.TextSize = 15
+    infoTitle.TextColor3 = textColorNormal
+    infoTitle.TextXAlignment = alignLeft
+
+    local infoClose = Instance.new('TextButton', infoFrame)
+    infoClose.Size = UDim2.fromOffset(24, 24)
+    infoClose.Position = UDim2.new(1, -30, 0, 7)
+    infoClose.BackgroundColor3 = colorActive
+    infoClose.BorderSizePixel = 0
+    infoClose.Font = fontBold
+    infoClose.Text = '✕'
+    infoClose.TextColor3 = textColorWhite
+    infoClose.TextSize = 14
+    addUICornerAndStroke(infoClose, 6, strokeColor1)
+    infoClose.MouseEnter:Connect(function() playTween(infoClose, hoverTween, {BackgroundColor3 = colorActiveHover}) end)
+    infoClose.MouseLeave:Connect(function() playTween(infoClose, hoverTween, {BackgroundColor3 = colorActive}) end)
+    infoClose.MouseButton1Click:Connect(function() infoFrame.Visible = false end)
+
+    local codeScrollFrame = Instance.new('ScrollingFrame', infoFrame)
+    codeScrollFrame.Size = UDim2.new(1, -16, 0, 80)
+    codeScrollFrame.Position = UDim2.fromOffset(8, 40)
+    codeScrollFrame.BackgroundColor3 = colorDark
+    codeScrollFrame.BorderSizePixel = 0
+    codeScrollFrame.CanvasSize = UDim2.new(2, 0, 0, 0)
+    codeScrollFrame.ScrollingDirection = Enum.ScrollingDirection.X
+
+    local codeLabel = Instance.new('TextLabel', codeScrollFrame)
+    codeLabel.Size = UDim2.new(0, 0, 1, 0)
+    codeLabel.AutomaticSize = Enum.AutomaticSize.X
+    codeLabel.BackgroundTransparency = 1
+    codeLabel.Font = Enum.Font.Code
+    codeLabel.Text = ''
+    codeLabel.TextColor3 = textColorBright
+    codeLabel.TextSize = 14
+    codeLabel.TextXAlignment = alignLeft
+
+    local actionScroll = Instance.new('ScrollingFrame', infoFrame)
+    actionScroll.Size = UDim2.new(1, -16, 1, -173)
+    actionScroll.Position = UDim2.fromOffset(8, 128)
+    actionScroll.BackgroundTransparency = 1
+    actionScroll.BorderSizePixel = 0
+    actionScroll.CanvasSize = udimZero
+    actionScroll.ScrollBarThickness = 4
+
+    local actionListLayout = Instance.new('UIListLayout', actionScroll)
+    actionListLayout.Padding = UDim.new(0, 5)
+    actionListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        actionScroll.CanvasSize = UDim2.fromOffset(0, actionListLayout.AbsoluteContentSize.Y)
+    end)
+
+    local clearLogsButton = makeButton('Clear Logs', infoFrame, 30)
+    clearLogsButton.Size = UDim2.new(1, -16, 0, 30)
+    clearLogsButton.Position = UDim2.new(0, 8, 1, -40)
+
+    local bottomBar = Instance.new('Frame', mainFrame)
+    bottomBar.Size = UDim2.new(1, 0, 0, 134)
+    bottomBar.Position = UDim2.new(0, 0, 1, -134)
+    bottomBar.BackgroundTransparency = 1
+    Instance.new('UIListLayout', bottomBar).Padding = UDim.new(0, 10)
+
+    local openRemoteBrowserButton = createMainButton('Open Remote Browser (B)')
+    openRemoteBrowserButton.Parent = bottomBar
+    
+    local spyToggleButton, spyToggleEvent = createToggleButton('Spy: [OFF]', 'Spy: [ON]')
+    spyToggleButton.Parent = bottomBar
+    
+    local clearAllActiveButton = createMainButton('Clear All Active')
+    clearAllActiveButton.Parent = bottomBar
+
+    local copyCodeButton = createActionButton('Copy Code', actionScroll)
+    local executeButton = createActionButton('Execute', actionScroll)
+    local copyScriptPathButton = createActionButton('Copy Script Path', actionScroll)
+    local copyDecompiledButton = createActionButton('Copy Decompiled', actionScroll)
+    local stackUnstackButton = createActionButton('Stack/Unstack', actionScroll)
+    local ignoreRemoteButton = createActionButton('Ignore Remote', actionScroll)
+    local ignoreArgsButton = createActionButton('Ignore Args', actionScroll)
+    local copyWhileLoopButton = createActionButton('Copy While Loop', actionScroll)
+
+    local autoFireRow = Instance.new('Frame', actionScroll)
+    autoFireRow.Size = UDim2.new(1, 0, 0, 30)
+    autoFireRow.BackgroundTransparency = 1
+    autoFireRow.BorderSizePixel = 0
+
+    local autoFireBox = Instance.new('TextBox', autoFireRow)
+    autoFireBox.Size = UDim2.fromOffset(55, 30)
+    autoFireBox.BackgroundColor3 = colorDark
+    autoFireBox.BorderSizePixel = 0
+    autoFireBox.Font = fontBold
+    autoFireBox.Text = '0.5'
+    autoFireBox.TextColor3 = textColorNormal
+    autoFireBox.TextSize = 13
+    autoFireBox.ClearTextOnFocus = false
+    Instance.new('UICorner', autoFireBox).CornerRadius = UDim.new(0, 6)
+    Instance.new('UIPadding', autoFireBox).PaddingLeft = UDim.new(0, 6)
+
+    local autoFireUnit = Instance.new('TextLabel', autoFireRow)
+    autoFireUnit.Size = UDim2.fromOffset(14, 30)
+    autoFireUnit.Position = UDim2.fromOffset(57, 0)
+    autoFireUnit.BackgroundTransparency = 1
+    autoFireUnit.Font = fontRegular
+    autoFireUnit.Text = 's'
+    autoFireUnit.TextColor3 = textColorTransparent
+    autoFireUnit.TextSize = 13
+
+    local autoFireButton = Instance.new('TextButton', autoFireRow)
+    autoFireButton.Size = UDim2.new(1, -76, 1, 0)
+    autoFireButton.Position = UDim2.fromOffset(76, 0)
+    autoFireButton.BackgroundColor3 = colorInteractable
+    autoFireButton.BorderSizePixel = 0
+    autoFireButton.Font = fontBold
+    autoFireButton.Text = 'Generate While Loop: OFF'
+    autoFireButton.TextColor3 = textColorNormal
+    autoFireButton.TextSize = 13
+    Instance.new('UICorner', autoFireButton).CornerRadius = UDim.new(0, 6)
+    autoFireButton.MouseEnter:Connect(function() playTween(autoFireButton, hoverTween, {BackgroundColor3 = autoFireActive and colorActiveHover or colorHover}) end)
+    autoFireButton.MouseLeave:Connect(function() playTween(autoFireButton, hoverTween, {BackgroundColor3 = autoFireActive and colorActive or colorInteractable}) end)
+
+    local executeCopyReturnButton = createActionButton('Execute & Copy Return', actionScroll)
+    
+    local remoteBrowserFrame = Instance.new('Frame', spyGui)
+    remoteBrowserFrame.Size = UDim2.fromOffset(250, 350)
+    remoteBrowserFrame.BackgroundColor3 = colorMedium
+    remoteBrowserFrame.BorderSizePixel = 0
+    remoteBrowserFrame.Visible = false
+    addUICornerAndStroke(remoteBrowserFrame, 6, strokeColor2)
+
+    local browserTop = Instance.new('Frame', remoteBrowserFrame)
+    browserTop.Size = UDim2.new(1, 0, 0, 30)
+    browserTop.BackgroundTransparency = 1
+
+    local browserTitleLabel = Instance.new('TextLabel', browserTop)
+    browserTitleLabel.Size = udimFull
+    browserTitleLabel.BackgroundTransparency = 1
+    browserTitleLabel.Font = fontBold
+    browserTitleLabel.Text = 'Remote Browser'
+    browserTitleLabel.TextColor3 = textColorNormal
+    browserTitleLabel.TextSize = 15
+
+    local browserScroll = Instance.new('ScrollingFrame', remoteBrowserFrame)
+    browserScroll.Size = UDim2.new(1, -16, 1, -40)
+    browserScroll.Position = UDim2.fromOffset(8, 35)
+    browserScroll.BackgroundTransparency = 1
+    browserScroll.BorderSizePixel = 0
+    browserScroll.CanvasSize = udimZero
+    browserScroll.ScrollBarThickness = 4
+
+    local browserListLayout = Instance.new('UIListLayout', browserScroll)
+    browserListLayout.Padding = UDim.new(0, 5)
+    browserListLayout:GetPropertyChangedSignal('AbsoluteContentSize'):Connect(function()
+        browserScroll.CanvasSize = UDim2.fromOffset(0, browserListLayout.AbsoluteContentSize.Y)
+    end)
+
+    task.wait()
+
+    local function applySearch(searchQuery)
+        searchQuery = searchQuery:lower()
+        for i = 1, #remoteList do
+            if listElements[i] then 
+                listElements[i].Visible = searchQuery == '' or remoteList[i].Name:lower():find(searchQuery, 1, true) ~= nil 
+            end
+        end
+    end
+
+    searchBox:GetPropertyChangedSignal('Text'):Connect(function() applySearch(searchBox.Text) end)
+
+    minimizeButton.MouseButton1Click:Connect(function()
+        if isMinimizing then return end
+        isMinimizing = true
+        if not isMinimized then
+            if infoFrame.Visible then infoFrame.Visible = false end
+            if remoteBrowserFrame.Visible then remoteBrowserFrame.Visible = false end
+            bottomBar.Visible = false
+            searchBox.Visible = false
+            logScroll.Visible = false
+            local tweenInstance = tweenServiceRef:Create(mainFrame, minimizeTween, {Size = UDim2.fromOffset(windowWidth, windowHeightMinimized)})
+            tweenInstance:Play()
+            tweenInstance.Completed:Wait()
+            isMinimized = true
+            minimizeButton.Text = '▲'
+        else
+            local tweenInstance = tweenServiceRef:Create(mainFrame, maximizeTween, {Size = UDim2.fromOffset(windowWidth, windowHeight)})
+            tweenInstance:Play()
+            tweenInstance.Completed:Wait()
+            isMinimized = false
+            minimizeButton.Text = '▼'
+            bottomBar.Visible = true
+            searchBox.Visible = true
+            logScroll.Visible = true
+        end
+        isMinimizing = false
+    end)
+
+    clearAllActiveButton.MouseButton1Click:Connect(function()
+        autoFireActive = false
+        autoFireGeneration = autoFireGeneration + 1
+        table.clear(stackedRemotes)
+        table.clear(ignoredRemotes)
+        table.clear(ignoredArgs)
+        autoFireButton.Text = 'Generate While Loop: OFF'
+        playTween(autoFireButton, clickTween, {BackgroundColor3 = colorInteractable})
+        if infoFrame.Visible then
+            stackUnstackButton.Text = 'Stack/Unstack'
+            ignoreRemoteButton.Text = 'Ignore Remote'
+            ignoreArgsButton.Text = 'Ignore Args'
+        end
+        showFeedback(clearAllActiveButton, 'Cleared!')
+    end)
+
+    openRemoteBrowserButton.MouseButton1Click:Connect(function()
+        remoteBrowserFrame.Visible = not remoteBrowserFrame.Visible
+        if not remoteBrowserFrame.Visible then return end
+        infoFrame.Visible = false
+        remoteBrowserFrame.Position = UDim2.fromOffset(mainFrame.AbsolutePosition.X + mainFrame.AbsoluteSize.X + 10, mainFrame.AbsolutePosition.Y)
+        for _, child in ipairs(browserScroll:GetChildren()) do
+            if not child:IsA('UIListLayout') then child:Destroy() end
+        end
+        for _, descendant in ipairs(game:GetDescendants()) do
+            if descendant:IsA('RemoteEvent') or descendant:IsA('RemoteFunction') then
+                local buttonInstance = createActionButton(descendant.Name .. ' (' .. descendant.ClassName .. ')', browserScroll)
+                buttonInstance.Size = UDim2.new(1, 0, 0, 25)
+                buttonInstance.TextXAlignment = alignLeft
+                buttonInstance.MouseButton1Click:Connect(function()
+                    setclipboard(getInstancePath(descendant))
+                    showFeedback(buttonInstance, 'Path Copied!')
+                end)
+            end
+        end
+    end)
+
+    local buttonConnections = {}
+    local function clearConnections()
+        autoFireActive = false
+        for i = 1, #buttonConnections do buttonConnections[i]:Disconnect() end
+        table.clear(buttonConnections)
+    end
+
+    local function openInfoPanel(remoteInstance, argsValue)
+        clearConnections()
+        infoFrame.Visible = true
+        infoFrame.Position = UDim2.fromOffset(mainFrame.AbsolutePosition.X + mainFrame.AbsoluteSize.X + 10, mainFrame.AbsolutePosition.Y)
+        infoTitle.Text = 'Info: ' .. remoteInstance.Name
+        local generatedCode = getInstancePath(remoteInstance) .. (remoteInstance:IsA('RemoteEvent') and ':FireServer(' or ':InvokeServer(') .. formatArguments(argsValue) .. ')'
+        codeLabel.Text = generatedCode
+        
+        local remoteIndex = findRemoteIndex(remoteInstance, argsValue)
+        local capturedScript = scriptList[remoteIndex]
+        
+        stackUnstackButton.Text = isRemoteStacked(remoteInstance) and 'Unstack Remote' or 'Stack Remote'
+        ignoreRemoteButton.Text = table.find(ignoredRemotes, getRootParent(remoteInstance)) and 'Unignore Remote' or 'Ignore Remote'
+        
+        local remoteKey, argKey = getArgumentsKey(remoteInstance, argsValue)
+        ignoreArgsButton.Text = (ignoredArgs[remoteKey] and ignoredArgs[remoteKey][argKey]) and 'Unignore Args' or 'Ignore Args'
+        
+        autoFireButton.Text = 'Generate While Loop: OFF'
+        playTween(autoFireButton, clickTween, {BackgroundColor3 = colorInteractable})
+
+        local function connectButton(buttonGui, callbackFunc) 
+            buttonConnections[#buttonConnections + 1] = buttonGui.MouseButton1Click:Connect(callbackFunc) 
+        end
+
+        connectButton(copyCodeButton, function() 
+            setclipboard(generatedCode)
+            showFeedback(copyCodeButton) 
+        end)
+
+        connectButton(executeButton, function()
+            showFeedback(executeButton, 'Executed!')
+            task.spawn(function()
+                if remoteInstance:IsA('RemoteEvent') then 
+                    remoteInstance:FireServer(unpack(argsValue))
+                else 
+                    pcall(remoteInstance.InvokeServer, remoteInstance, unpack(argsValue)) 
+                end
+            end)
+        end)
+
+        connectButton(copyScriptPathButton, function()
+            if capturedScript then 
+                setclipboard(getInstancePath(capturedScript))
+                showFeedback(copyScriptPathButton, 'Path Copied!')
+            else 
+                showFeedback(copyScriptPathButton, 'No Script Info') 
+            end
+        end)
+
+        connectButton(copyDecompiledButton, function()
+            if not decompile then 
+                showFeedback(copyDecompiledButton, 'Not Supported')
+                return 
+            end
+            if not capturedScript then 
+                showFeedback(copyDecompiledButton, 'No Script Info')
+                return 
+            end
+            local success, result = pcall(decompile, capturedScript)
+            if success and result then 
+                setclipboard(result)
+                showFeedback(copyDecompiledButton, 'Decompiled!')
+            else 
+                showFeedback(copyDecompiledButton, 'Decompile Failed') 
+            end
+        end)
+
+        connectButton(copyWhileLoopButton, function() 
+            setclipboard('while task.wait() do\n    ' .. generatedCode .. '\nend')
+            showFeedback(copyWhileLoopButton) 
+        end)
+
+        connectButton(executeCopyReturnButton, function()
+            if not remoteInstance:IsA('RemoteFunction') then 
+                showFeedback(executeCopyReturnButton, 'RemoteEvent Only!')
+                return 
+            end
+            task.spawn(function()
+                local success, result = pcall(function() 
+                    return serializeTable({remoteInstance:InvokeServer(unpack(argsValue))}) 
+                end)
+                if success then 
+                    setclipboard(result)
+                    showFeedback(executeCopyReturnButton, 'Return Copied!')
+                else 
+                    showFeedback(executeCopyReturnButton, 'Invoke Failed!') 
+                end
+            end)
+        end)
+
+        connectButton(stackUnstackButton, function()
+            local pathKey = getInstancePath(remoteInstance)
+            local isStackedValue = isRemoteStacked(remoteInstance)
+            if isStackedValue then 
+                stackedRemotes[pathKey] = false
+                stackUnstackButton.Text = 'Stack Remote'
+                showFeedback(stackUnstackButton, 'Stacking Off')
+            else 
+                stackedRemotes[pathKey] = true
+                stackUnstackButton.Text = 'Unstack Remote'
+                showFeedback(stackUnstackButton, 'Stacking On') 
+            end
+        end)
+
+        connectButton(ignoreRemoteButton, function()
+            local rootParent = getRootParent(remoteInstance)
+            local indexFound = table.find(ignoredRemotes, rootParent)
+            if indexFound then 
+                table.remove(ignoredRemotes, indexFound)
+                ignoreRemoteButton.Text = 'Ignore Remote'
+                showFeedback(ignoreRemoteButton, 'Ignoring Off')
+            else 
+                table.insert(ignoredRemotes, rootParent)
+                ignoreRemoteButton.Text = 'Unignore Remote'
+                showFeedback(ignoreRemoteButton, 'Ignoring On') 
+            end
+        end)
+
+        connectButton(ignoreArgsButton, function()
+            local rKey, aKey = getArgumentsKey(remoteInstance, argsValue)
+            ignoredArgs[rKey] = ignoredArgs[rKey] or {}
+            if ignoredArgs[rKey][aKey] then 
+                ignoredArgs[rKey][aKey] = nil
+                ignoreArgsButton.Text = 'Ignore Args'
+                showFeedback(ignoreArgsButton, 'Args Ignoring Off')
+            else 
+                ignoredArgs[rKey][aKey] = true
+                ignoreArgsButton.Text = 'Unignore Args'
+                showFeedback(ignoreArgsButton, 'Args Ignoring On') 
+            end
+        end)
+
+        connectButton(autoFireButton, function()
+            autoFireActive = not autoFireActive
+            if autoFireActive then
+                autoFireGeneration = autoFireGeneration + 1
+                local currentGeneration = autoFireGeneration
+                local intervalValue = math.max(0.05, tonumber(autoFireBox.Text) or 0.5)
+                autoFireButton.Text = 'Generate While Loop: ON'
+                playTween(autoFireButton, clickTween, {BackgroundColor3 = colorActive})
+                task.spawn(function()
+                    while autoFireActive and autoFireGeneration == currentGeneration do
+                        if remoteInstance:IsA('RemoteEvent') then 
+                            remoteInstance:FireServer(unpack(argsValue))
+                        else 
+                            remoteInstance:InvokeServer(unpack(argsValue)) 
+                        end
+                        task.wait(intervalValue)
+                    end
+                end)
+            else
+                autoFireButton.Text = 'Generate While Loop: OFF'
+                playTween(autoFireButton, clickTween, {BackgroundColor3 = colorInteractable})
+            end
+        end)
+    end
+
+    local function captureRemote(isEvent, remoteInstance, ...)
+        local rKey, aKey = getArgumentsKey(remoteInstance, {...})
+        if spyActive and remoteInstance and not table.find(ignoredRemotes, getRootParent(remoteInstance)) and not (ignoredArgs[rKey] and ignoredArgs[rKey][aKey]) then
+            pendingQueue[#pendingQueue + 1] = {isEvent = isEvent, remote = remoteInstance, args = {...}, script = checkcaller and getcallingscript() or nil}
+        end
+    end
+
+    local function processQueue()
+        if not next(pendingQueue) then return end
+        local queueBatch = pendingQueue
+        pendingQueue = {}
+        for _, eventData in ipairs(queueBatch) do
+            local indexFound = findRemoteIndex(eventData.remote, eventData.args)
+            if indexFound then
+                if countLabelList[indexFound] and countLabelList[indexFound].Parent then
+                    argsList[indexFound] = eventData.args
+                    countLabelList[indexFound].Text = tostring(tonumber(countLabelList[indexFound].Text) + 1)
+                end
+            else
+                local listButton = Instance.new('TextButton', logScroll)
+                listButton.Size = UDim2.new(1, 0, 0, 30)
+                listButton.BackgroundColor3 = colorInteractable
+                listButton.BorderSizePixel = 0
+                listButton.Font = fontRegular
+                listButton.Text = ''
+                Instance.new('UICorner', listButton).CornerRadius = UDim.new(0, 6)
+                listButton.MouseEnter:Connect(function() playTween(listButton, hoverTween, {BackgroundColor3 = colorHover}) end)
+                listButton.MouseLeave:Connect(function() playTween(listButton, hoverTween, {BackgroundColor3 = colorInteractable}) end)
+                
+                local countLabel = Instance.new('TextLabel', listButton)
+                countLabel.Size = UDim2.fromOffset(30, 30)
+                countLabel.Position = UDim2.fromOffset(5, 0)
+                countLabel.BackgroundTransparency = 1
+                countLabel.Font = fontBold
+                countLabel.Text = '1'
+                countLabel.TextColor3 = textColorDark
+                countLabel.TextSize = 14
+                countLabel.TextXAlignment = alignLeft
+                
+                local nameLabel = Instance.new('TextLabel', listButton)
+                nameLabel.Size = UDim2.new(1, -35, 1, 0)
+                nameLabel.Position = UDim2.fromOffset(35, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Font = fontRegular
+                nameLabel.Text = eventData.remote.Name
+                nameLabel.TextColor3 = textColorNormal
+                nameLabel.TextSize = 14
+                nameLabel.TextXAlignment = alignLeft
+                
+                local newIndex = #remoteList + 1
+                remoteList[newIndex] = eventData.remote
+                argsList[newIndex] = eventData.args
+                countLabelList[newIndex] = countLabel
+                scriptList[newIndex] = eventData.script
+                listElements[newIndex] = listButton
+                
+                local currentQuery = searchBox.Text:lower()
+                if currentQuery ~= '' then 
+                    listButton.Visible = eventData.remote.Name:lower():find(currentQuery, 1, true) ~= nil 
+                end
+                listButton.MouseButton1Click:Connect(function() openInfoPanel(eventData.remote, argsList[newIndex]) end)
+            end
+        end
+    end
+
+    clearLogsButton.MouseButton1Click:Connect(function()
+        clearConnections()
+        for _, child in ipairs(logScroll:GetChildren()) do
+            if not child:IsA('UIListLayout') then child:Destroy() end
+        end
+        table.clear(remoteList)
+        table.clear(argsList)
+        table.clear(countLabelList)
+        table.clear(scriptList)
+        table.clear(listElements)
+        table.clear(pendingQueue)
+        searchBox.Text = ''
+        infoFrame.Visible = false
+        showFeedback(clearLogsButton, 'Cleared!')
+    end)
+
+    userInputService.InputBegan:Connect(function(inputObject, gameProcessed)
+        if gameProcessed or userInputService:GetFocusedTextBox() ~= nil then return end
+        if inputObject.KeyCode == Enum.KeyCode[configData.Settings.Keybind] then
+            mainFrame.Visible = not mainFrame.Visible
+            infoFrame.Visible = false
+            remoteBrowserFrame.Visible = false
+        end
+    end)
+
+    task.wait()
+
+    local oldNamecall
+    do
+        local metaTable = getmetatable(game)
+        if metaTable then oldNamecall = metaTable.__namecall end
+    end
+
+    local function hookNamecall()
+        if spyHooked then return end
+        if not hookmetamethod or not getnamecallmethod then return end
+        if getmetatable(game) then
+            oldNamecall = hookmetamethod(game, '__namecall', function(self, ...)
+                if not (checkcaller and checkcaller()) then
+                    local methodName = getnamecallmethod()
+                    if methodName == 'FireServer' and self.ClassName == 'RemoteEvent' then
+                        captureRemote(true, self, ...)
+                    elseif methodName == 'InvokeServer' and self.ClassName == 'RemoteFunction' then
+                        captureRemote(false, self, ...)
+                    end
+                end
+                return oldNamecall(self, ...)
+            end)
+            spyHooked = true
+        end
+    end
+
+    local function unhookNamecall()
+        if not spyHooked or not oldNamecall then return end
+        if not hookmetamethod then return end
+        if getmetatable(game) then
+            hookmetamethod(game, '__namecall', oldNamecall)
+            spyHooked = false
+        end
+    end
+
+    spyToggleEvent:Connect(function(isOn) 
+        spyActive = isOn
+        if isOn then hookNamecall() else unhookNamecall() end 
+    end)
+
+    task.wait()
+    runService.Heartbeat:Connect(processQueue)
+
+    local isDragging = false
+    local dragStart = nil
+    local dragStartPos = nil
+
+    mainFrame.InputBegan:Connect(function(inputObject)
+        if inputObject.UserInputType == inputMouseButton1 or inputObject.UserInputType == inputTouch then
+            dragStartPos = mainFrame.Position
+            dragStart = inputObject.Position
+            isDragging = true
+        end
+    end)
+
+    mainFrame.InputEnded:Connect(function(inputObject)
+        if inputObject.UserInputType == inputMouseButton1 or inputObject.UserInputType == inputTouch then 
+            isDragging = false 
+        end
+    end)
+
+    userInputService.InputChanged:Connect(function(inputObject)
+        if not isDragging then return end
+        if inputObject.UserInputType ~= inputMouseMovement and inputObject.UserInputType ~= inputTouch then return end
+        local deltaPos = inputObject.Position - dragStart
+        mainFrame.Position = UDim2.new(dragStartPos.X.Scale, dragStartPos.X.Offset + deltaPos.X, dragStartPos.Y.Scale, dragStartPos.Y.Offset + deltaPos.Y)
+        
+        local offsetX = mainFrame.AbsolutePosition.X + mainFrame.AbsoluteSize.X + 10
+        local offsetY = mainFrame.AbsolutePosition.Y
+        if infoFrame.Visible then infoFrame.Position = UDim2.fromOffset(offsetX, offsetY) end
+        if remoteBrowserFrame.Visible then remoteBrowserFrame.Position = UDim2.fromOffset(offsetX, offsetY) end
+    end)
+
+    bindableEvent:Fire(mainFrame)
+end)
+
+while not isFinished do task.wait() end
+
+bindableEvent:Destroy()
+spinnerTween:Cancel()
+spinnerFrame:Destroy()
+
+tweenService:Create(creatorText, TweenInfo.new(0.6), {TextTransparency = 0}):Play()
+task.wait(2)
+tweenService:Create(creatorText, TweenInfo.new(0.4), {TextTransparency = 1}):Play()
+tweenService:Create(loadingBackground, TweenInfo.new(0.4), {BackgroundTransparency = 1}):Play()
+task.wait(0.5)
+
+loadingGui:Destroy()
+
+local finalMainFrame = mainFrameObj
+mainFrameObj = nil
+if not finalMainFrame then return end
+
+finalMainFrame.Visible = true
+finalMainFrame.Position = UDim2.new(0.5, -140, 0.45, -240)
+tweenService:Create(finalMainFrame, TweenInfo.new(0.5, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Position = UDim2.new(0.5, -140, 0.5, -240)}):Play()
