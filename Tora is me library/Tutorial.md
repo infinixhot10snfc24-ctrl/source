@@ -4,7 +4,7 @@ Before creating any UI elements, you need to load the library using your raw scr
 
 ```lua
 -- Replace with your actual raw link
-local Library = loadstring(game:HttpGet("YOUR_RAW_LINK_HERE"))()
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/infinixhot10snfc24-ctrl/source/refs/heads/main/Tora%20is%20me%20library/library.lua"))()
 ```
 
 ---
