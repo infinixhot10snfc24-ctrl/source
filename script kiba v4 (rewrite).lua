@@ -1,10 +1,13 @@
+if getgenv().kiba_tech_loaded then return end
+getgenv().kiba_tech_loaded = true
+
 getgenv().binding_lethal_kiba = getgenv().binding_lethal_kiba or "off"
 
 local Players = game:GetService("Players") local RunService = game:GetService("RunService") local StarterGui = game:GetService("StarterGui") local Workspace = game:GetService("Workspace") local UserInputService = game:GetService("UserInputService") local TweenService = game:GetService("TweenService")
 
-local LocalPlayer = Players.LocalPlayer local GetPlayerFromCharacter = Players.GetPlayerFromCharacter
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait() local GetPlayerFromCharacter = Players.GetPlayerFromCharacter
 
-local ScreenGui = Instance.new("ScreenGui") ScreenGui.Parent = game.CoreGui
+local ScreenGui = Instance.new("ScreenGui") ScreenGui.Name = "KibaTechToggleGui" ScreenGui.Parent = game.CoreGui
 
 local ToggleFrame = Instance.new("Frame") ToggleFrame.Size = UDim2.new(0,135,0,40) ToggleFrame.Position = UDim2.new(0,20,0,200) ToggleFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25) ToggleFrame.BackgroundTransparency = 0.2 ToggleFrame.BorderSizePixel = 0 ToggleFrame.Active = true ToggleFrame.Parent = ScreenGui
 
@@ -16,7 +19,7 @@ local Indicator = Instance.new("TextLabel") Indicator.Size = UDim2.new(0,24,0,24
 
 local Label = Instance.new("TextLabel") Label.Size = UDim2.new(1,-44,1,0) Label.Position = UDim2.new(0,38,0,0) Label.Text = "kiba tech" Label.TextScaled = false Label.TextSize = 14 Label.BackgroundTransparency = 1 Label.TextColor3 = Color3.fromRGB(230, 230, 235) Label.Font = Enum.Font.GothamBold Label.TextXAlignment = Enum.TextXAlignment.Left Label.Parent = ToggleFrame
 
-local Enabled = false local colorTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out)
+local Enabled = false local colorTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out) local ActiveColorTween = nil
 
 local DETECTION_RANGE = 10 local DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE local ANCHOR_PITCH_RAD = math.rad(55) local ANCHOR_OFFSET_CFRAME = CFrame.new(0, 0, 0) * CFrame.Angles(ANCHOR_PITCH_RAD, 0, 0) local KEY_W = Enum.KeyCode.W local KEY_Q = Enum.KeyCode.Q
 
@@ -42,7 +45,7 @@ SavedAutoRotate = nil
 
 end
 
-local function updateUI() local targetColor = Enabled and Color3.fromRGB(120,255,160) or Color3.fromRGB(255,90,90) local colorTween = TweenService:Create(Indicator, colorTweenInfo, {TextColor3 = targetColor}) colorTween:Play() end
+local function updateUI() local targetColor = Enabled and Color3.fromRGB(120,255,160) or Color3.fromRGB(255,90,90) if ActiveColorTween then ActiveColorTween:Cancel() end local colorTween = TweenService:Create(Indicator, colorTweenInfo, {TextColor3 = targetColor}) ActiveColorTween = colorTween colorTween:Play() end
 
 local dragging = false local dragInput local dragStart local startPos local dragThreshold = 5 local hasMoved = false
 
@@ -70,7 +73,7 @@ ToggleFrame.InputChanged:Connect(function(input) if input.UserInputType == Enum.
 
 UserInputService.InputChanged:Connect(function(input) if input == dragInput and dragging then local delta = input.Position - dragStart if delta.Magnitude > dragThreshold then hasMoved = true end if hasMoved then ToggleFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y) end end end)
 
-local function showNotification() task.spawn(function() for _ = 1, 5 do if game:IsLoaded() then StarterGui:SetCore("SendNotification", { Title = "The Strongest Battleground", Text = "Script executed", Duration = 5, }) return end task.wait(0.2) end end) end
+local function showNotification() task.spawn(function() for _ = 1, 5 do if game:IsLoaded() then local ok = pcall(function() StarterGui:SetCore("SendNotification", { Title = "The Strongest Battleground", Text = "Script executed", Duration = 5, }) end) if ok then return end end task.wait(0.2) end end) end
 
 showNotification()
 
@@ -108,8 +111,9 @@ end
 
 local function trackModel(model) if not (model and model:IsA("Model")) then return end if TrackedModels[model] then return end
 
+local root = model:FindFirstChild("HumanoidRootPart") if root and not root:IsA("BasePart") then root = nil end
 local info = { 
-	root = model:FindFirstChild("HumanoidRootPart"), 
+	root = root, 
 	humanoid = model:FindFirstChildOfClass("Humanoid"), 
 	forceFieldPresent = model:FindFirstChildOfClass("ForceField") ~= nil, 
 	connections = {}, 
@@ -119,7 +123,7 @@ TrackedModels[model] = info
 TrackedModelList[#TrackedModelList + 1] = model
 
 info.connections[1] = model.ChildAdded:Connect(function(child) 
-	if child.Name == "HumanoidRootPart" then 
+	if child.Name == "HumanoidRootPart" and child:IsA("BasePart") then 
 		info.root = child 
 	elseif child:IsA("Humanoid") then 
 		info.humanoid = child 
@@ -193,7 +197,7 @@ for i = 1, #models do
 		if info then 
 			local targetRoot = info.root 
 			local enemyHum = info.humanoid 
-			if targetRoot and targetRoot.Parent and enemyHum and enemyHum.Parent and enemyHum.Health > 0 and not info.forceFieldPresent then 
+			if targetRoot and targetRoot:IsA("BasePart") and targetRoot.Parent and enemyHum and enemyHum.Parent and enemyHum.Health > 0 and not info.forceFieldPresent then 
 				local offset = targetRoot.Position - currentPos 
 				local distSq = offset.X * offset.X + offset.Y * offset.Y + offset.Z * offset.Z
 
@@ -271,7 +275,7 @@ FollowConnection = RunService.RenderStepped:Connect(function()
 	local currentRoot = RootPart 
 	if currentTarget and currentTarget.Parent and currentRoot and currentRoot.Parent then 
 		local currentRig = FollowRig 
-		if currentRig and currentRig.AnchorPart then 
+		if currentRig and currentRig.AnchorPart and currentRig.AnchorPart.Parent then 
 			currentRig.AnchorPart.CFrame = currentTarget.CFrame * ANCHOR_OFFSET_CFRAME 
 		end 
 	else 
@@ -321,8 +325,8 @@ task.delay(initialDelay, function()
 
 	local target = getNearestTarget() 
 	if target then 
-		startFollowTarget(target, duration)
-	end
+		startFollowTarget(target, duration) 
+	end 
 end)
 
 end
@@ -342,7 +346,7 @@ Character = char
 local hum = char:WaitForChild("Humanoid", 10) 
 local root = char:WaitForChild("HumanoidRootPart", 10)
 
-if not hum or not root then return end
+if not hum or not root then Humanoid = nil RootPart = nil return end
 if CurrentActionId ~= myId then return end
 
 Humanoid = hum 
