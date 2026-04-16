@@ -5,7 +5,7 @@ getgenv().binding_lethal_kiba = getgenv().binding_lethal_kiba or "off"
 
 local Players = game:GetService("Players") local RunService = game:GetService("RunService") local StarterGui = game:GetService("StarterGui") local Workspace = game:GetService("Workspace") local UserInputService = game:GetService("UserInputService") local TweenService = game:GetService("TweenService")
 
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait() local GetPlayerFromCharacter = Players.GetPlayerFromCharacter
 
 local ScreenGui = Instance.new("ScreenGui") ScreenGui.Name = "KibaTechToggleGui" ScreenGui.Parent = game.CoreGui
 
@@ -201,7 +201,7 @@ for i = 1, #models do
 				local offset = targetRoot.Position - currentPos 
 				local distSq = offset.X * offset.X + offset.Y * offset.Y + offset.Z * offset.Z
 
-				if distSq <= shortestDistSq and (model.Name == "Weakest Dummy" or Players:GetPlayerFromCharacter(model)) then 
+				if distSq <= shortestDistSq and (model.Name == "Weakest Dummy" or GetPlayerFromCharacter(target, model)) then 
 					shortestDistSq = distSq 
 					nearestPart = targetRoot 
 				end 
