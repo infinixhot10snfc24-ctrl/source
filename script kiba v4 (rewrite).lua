@@ -201,7 +201,7 @@ for i = 1, #models do
 				local offset = targetRoot.Position - currentPos 
 				local distSq = offset.X * offset.X + offset.Y * offset.Y + offset.Z * offset.Z
 
-				if distSq <= shortestDistSq and (model.Name == "Weakest Dummy" or GetPlayerFromCharacter(Players, model)) then 
+				if distSq <= shortestDistSq and (model.Name == "Weakest Dummy" or GetPlayerFromCharacter(model)) then 
 					shortestDistSq = distSq 
 					nearestPart = targetRoot 
 				end 
