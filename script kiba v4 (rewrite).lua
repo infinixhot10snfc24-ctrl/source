@@ -21,7 +21,7 @@ local Label = Instance.new("TextLabel") Label.Size = UDim2.new(1,-44,1,0) Label.
 
 local Enabled = false local colorTweenInfo = TweenInfo.new(0.3, Enum.EasingStyle.Cubic, Enum.EasingDirection.Out) local ActiveColorTween = nil
 
-local DETECTION_RANGE = 10 local DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE local ANCHOR_PITCH_RAD = math.rad(55) local ANCHOR_OFFSET_CFRAME = CFrame.new(0, 0, 0) * CFrame.Angles(ANCHOR_PITCH_RAD, 0, 0) local KEY_W = Enum.KeyCode.W local KEY_Q = Enum.KeyCode.Q
+local DETECTION_RANGE = 20 local DETECTION_RANGE_SQ = DETECTION_RANGE * DETECTION_RANGE local ANCHOR_PITCH_RAD = math.rad(55) local ANCHOR_OFFSET_CFRAME = CFrame.new(0, 0, 0) * CFrame.Angles(ANCHOR_PITCH_RAD, 0, 0) local KEY_W = Enum.KeyCode.W local KEY_Q = Enum.KeyCode.Q
 
 local DashAnimations = { ["10503381238"] = true, ["13379003796"] = true, ["12296113986"] = true, ["95034083206292"] = true, }
 
