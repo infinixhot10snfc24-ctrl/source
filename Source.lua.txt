@@ -20361,6 +20361,39 @@ NAmanage.inferRequiresArguments=function(infoTable)
 	return false
 end
 
+NAmanage._commandRuntimeInit = NAmanage._commandRuntimeInit or {}
+NAmanage._commandRuntimeDone = NAmanage._commandRuntimeDone or {}
+
+NAmanage.registerCommandRuntimeInit = function(commandName, initFn)
+	if type(commandName) ~= "string" or commandName == "" then
+		return
+	end
+	if type(initFn) ~= "function" then
+		NAmanage._commandRuntimeInit[Lower(commandName)] = nil
+		return
+	end
+	NAmanage._commandRuntimeInit[Lower(commandName)] = initFn
+end
+
+NAmanage.ensureCommandRuntime = function(commandName)
+	if type(commandName) ~= "string" or commandName == "" then
+		return
+	end
+	local lowerName = Lower(commandName)
+	if NAmanage._commandRuntimeDone[lowerName] then
+		return
+	end
+	NAmanage._commandRuntimeDone[lowerName] = true
+	local initFn = NAmanage._commandRuntimeInit[lowerName]
+	if type(initFn) == "function" then
+		local ok, err = pcall(initFn, lowerName)
+		if not ok then
+			NAmanage._commandRuntimeDone[lowerName] = nil
+			warn("[NA] Command runtime init failed for "..tostring(lowerName)..": "..tostring(err))
+		end
+	end
+end
+
 cmd.add = function(aliases, info, func, requiresArguments, meta)
 	if type(requiresArguments) == "table" and meta == nil then
 		meta = requiresArguments
@@ -20420,7 +20453,14 @@ cmd.add = function(aliases, info, func, requiresArguments, meta)
 	if meta.patched then
 		infoTable = NAmanage.ensurePatchedInfo(infoTable)
 	end
-	local data = {func, infoTable, requiresArguments, meta}
+	local commandRunner = func
+	if type(func) == "function" and primaryLower then
+		commandRunner = function(...)
+			NAmanage.ensureCommandRuntime(primaryLower)
+			return func(...)
+		end
+	end
+	local data = {commandRunner, infoTable, requiresArguments, meta}
 	if primaryLower then
 		if not cmds.Commands[primaryLower] then
 			commandcount += 1
@@ -24272,7 +24312,7 @@ NAmanage.LoadFlyKeybinds = function()
 	flyVariables.tflyToggleKey = NAmanage.normalizeFlyBindKey(decoded.tfly, flyVariables.tflyToggleKey or "t")
 end
 
-NAmanage.LoadFlyKeybinds()
+flyVariables.runtimeArmed = false
 
 -----------------------------
 
@@ -25140,6 +25180,23 @@ end
 
 NAmanage.connectTFlyKey=function()
 	NAmanage._connectFlyToggleKey("tflyKeyConn", "tflyToggleKey", "tfly")
+end
+
+NAmanage.ensureFlyRuntime = function()
+	if flyVariables.runtimeArmed then
+		return
+	end
+	flyVariables.runtimeArmed = true
+	NAmanage.LoadFlyKeybinds()
+	NAmanage.connectFlyKey()
+	NAmanage.connectVFlyKey()
+	NAmanage.connectCFlyKey()
+	NAmanage.connectTFlyKey()
+	NAmanage.startWatcher()
+end
+
+for _, flyCommandName in ipairs({"fly", "vfly", "cfly", "cframefly", "tfly", "tweenfly"}) do
+	NAmanage.registerCommandRuntimeInit(flyCommandName, NAmanage.ensureFlyRuntime)
 end
 
 NAmanage.readAliasFile = function()
@@ -33448,8 +33505,8 @@ end)
 
 cmd.fn({"vfly","vehiclefly"},{"vehiclefly (vfly)","be able to fly vehicles"},function(...)
 	local arg=(...) or nil
+	NAmanage.ensureFlyRuntime()
 	flyVariables.vFlySpeed=tonumber(arg) or flyVariables.vFlySpeed or 1
-	NAmanage.connectVFlyKey()
 	NAmanage.activateFlightModeFromCommand("vfly")
 	if not IsOnMobile then
 		Wait()
@@ -42075,8 +42132,8 @@ end)
 
 cmd.fn({"fly"},{"fly [speed]","Enable flight"},function(...)
 	local arg=(...) or nil
+	NAmanage.ensureFlyRuntime()
 	flyVariables.flySpeed=tonumber(arg) or flyVariables.flySpeed or 1
-	NAmanage.connectFlyKey()
 	NAmanage.activateFlightModeFromCommand("fly")
 	if not IsOnMobile then
 		Wait()
@@ -42090,9 +42147,9 @@ end)
 
 cmd.fn({"cframefly","cfly"},{"cframefly [speed] (cfly)","Enable CFrame-based flight"},function(...)
 	local arg=(...) or nil
+	NAmanage.ensureFlyRuntime()
 	flyVariables.cFlySpeed=tonumber(arg) or flyVariables.cFlySpeed or 1
 	flyVariables.flySpeed=flyVariables.cFlySpeed
-	NAmanage.connectCFlyKey()
 	NAmanage.activateFlightModeFromCommand("cfly")
 	if not IsOnMobile then
 		Wait()
@@ -42106,8 +42163,8 @@ end)
 
 cmd.fn({"tfly","tweenfly"},{"tfly [speed] (tweenfly)","Enables smooth flying"},function(...)
 	local arg=(...) or nil
+	NAmanage.ensureFlyRuntime()
 	flyVariables.TflySpeed=tonumber(arg) or flyVariables.TflySpeed or 1
-	NAmanage.connectTFlyKey()
 	NAmanage.activateFlightModeFromCommand("tfly")
 	if not IsOnMobile then
 		Wait()
@@ -78532,11 +78589,13 @@ SpawnCall(function()
 		setupFLASHBACK(c)
 		NAmanage.ExecuteBindings("OnSpawn", LocalPlayer, c)
 
-		NAmanage.connectFlyKey()
-		NAmanage.connectVFlyKey()
-		NAmanage.connectCFlyKey()
-		NAmanage.connectTFlyKey()
-		NAmanage.startWatcher()
+		if flyVariables.runtimeArmed then
+			NAmanage.connectFlyKey()
+			NAmanage.connectVFlyKey()
+			NAmanage.connectCFlyKey()
+			NAmanage.connectTFlyKey()
+			NAmanage.startWatcher()
+		end
 
 		SpawnCall(function()
 			if not NAmanage._persist or NAmanage._persist.resumeAfterSpawn then
@@ -78576,7 +78635,9 @@ SpawnCall(function()
 		setupFLASHBACK(LocalPlayer.Character)
 	end
 
-	NAmanage.startWatcher()
+	if flyVariables.runtimeArmed then
+		NAmanage.startWatcher()
+	end
 end)
 
 do
